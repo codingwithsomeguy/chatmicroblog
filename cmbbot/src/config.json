@@ -1,0 +1,10 @@
+{
+    "approvers": {
+        "SLACKID": "Username Hint (can be an empty string)"
+    },
+    "approvedemojinames": [
+        "green_book",
+        "white_check_mark"
+    ],
+    "webcmbaddurl": "https://example.com/_functions/cmbadd"
+}

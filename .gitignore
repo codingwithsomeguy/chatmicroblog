@@ -1,0 +1,5 @@
+package-lock.json
+.*.sw[opx]
+node_modules
+*creds.json
+.env
