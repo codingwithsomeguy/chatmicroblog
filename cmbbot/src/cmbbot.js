@@ -116,11 +116,11 @@ async function getMessageWithReaction(event, client) {
     return conversationHistory.messages[0];
 }
 
-function meetsStoryCriteria(message, say, threadTs) {
+function meetsStoryCriteria(message, say, threadTs, authUserId) {
     let result = false;
     let needToSay;
 
-    if (authedUsers.includes(message.user) === true) {
+    if (authedUsers.includes(authUserId) === true) {
         const messageText = message.text.trim();
 
         if (messageText.indexOf("\n") > 0) {
@@ -134,6 +134,8 @@ function meetsStoryCriteria(message, say, threadTs) {
             needToSay = "need a title line and a story at minimum";
             result = false;
         }
+    } else {
+        console.log("ignoring unauthorized user on story", authUserId);
     }
 
     if (needToSay !== undefined) {
@@ -153,8 +155,7 @@ app.event("reaction_added", async ({event, client, say}) => {
         // console.log("auth emoji: reaction_added", event);
         try {
             const reactedMessage = await getMessageWithReaction(event, client);
-            // console.log("reactedMessage.userName:", reactedMessage.userName);
-            if (meetsStoryCriteria(reactedMessage, say, reactedMessage.ts) === true) {
+            if (meetsStoryCriteria(reactedMessage, say, reactedMessage.ts, event.user) === true) {
                 const messageLines = reactedMessage.text.trim().split("\n");
 
                 publishStory(say, reactedMessage.user, reactedMessage.userName, reactedMessage.ts, messageLines, reactedMessage.files[0]);
