@@ -4,6 +4,7 @@
 require("dotenv").config({debug: true, path: "../../.env"});
 
 const fs = require("fs");
+const winston = require("winston");
 const bolt = require("@slack/bolt");
 const axios = require("axios");
 const jose = require("jose");
@@ -12,6 +13,26 @@ const config = JSON.parse(fs.readFileSync("config.json", "utf-8"));
 
 const authEmoji = config.approvedemojinames;
 const authedUsers = Object.keys(config.approvers);
+
+const logger = (function () {
+    return winston.createLogger({
+        level: "info",
+        format: winston.format.combine(
+            winston.format.timestamp(),
+            winston.format.json(),
+        ),
+        defaultMeta: {service: "cmbbot"},
+        transports: [
+            new winston.transports.File({
+                filename: "cmbbot.log",
+                // level: "error",
+            }),
+            new winston.transports.Console({
+                format: winston.format.simple(),
+            }),
+        ],
+    });
+})();
 
 const app = new bolt.App({
     token: process.env.CMB_SLACK_TOKEN,
@@ -25,7 +46,7 @@ async function getPublicKey() {
 }
 
 async function downloadImageUrl(url) {
-    console.log("downloadImageUrl:", url);
+    logger.info("downloadImageUrl:", url);
     return axios.get(url, {
         headers: {Authorization: `Bearer ${process.env.CMB_SLACK_TOKEN}`},
         responseType: "arraybuffer",
@@ -33,9 +54,9 @@ async function downloadImageUrl(url) {
 }
 
 async function publishStory(say, authorUserId, authorUserName, threadTs, storyLines, imgAttachment) {
-    // console.log("publishStory:", storyLines);
+    logger.debug("publishStory:", storyLines);
     const allowedImageTypes = ["png", "jpeg", "jpg"];
-    // console.log("imgAttachment: mime:", imgAttachment.mimetype, imgAttachment.filetype);
+    logger.debug("imgAttachment: mime:", imgAttachment.mimetype, imgAttachment.filetype);
     if (allowedImageTypes.includes(imgAttachment.filetype.toLowerCase()) === false) {
         await say({
             text: `only ${allowedImageTypes} accepted at the moment`,
@@ -89,7 +110,7 @@ async function publishStory(say, authorUserId, authorUserName, threadTs, storyLi
             thread_ts: threadTs,
         });
     }).catch(async err => {
-        // console.log("post error:", err.data);
+        logger.debug("post error:", err.data);
         await say({
             text: `Story didn't publish, post response: ${err.message}`,
             thread_ts: threadTs,
@@ -135,7 +156,7 @@ function meetsStoryCriteria(message, say, threadTs, authUserId) {
             result = false;
         }
     } else {
-        console.log("ignoring unauthorized user on story", authUserId);
+        logger.debug(`ignoring unauthorized user[${authUserId}] on story`);
     }
 
     if (needToSay !== undefined) {
@@ -151,8 +172,9 @@ function meetsStoryCriteria(message, say, threadTs, authUserId) {
 
 // TODO: watch for ordering / double approvals (from unauth and auth in particular)
 app.event("reaction_added", async ({event, client, say}) => {
+    logger.info("reaction_added");
     if (authEmoji.includes(event.reaction) === true) {
-        // console.log("auth emoji: reaction_added", event);
+        logger.debug("auth emoji: reaction_added", event);
         try {
             const reactedMessage = await getMessageWithReaction(event, client);
             if (meetsStoryCriteria(reactedMessage, say, reactedMessage.ts, event.user) === true) {
@@ -166,16 +188,16 @@ app.event("reaction_added", async ({event, client, say}) => {
     }
 });
 
-app.message("ping", async ({event, say}) => {
+/* app.message("ping", async ({event, say}) => {
     // await say("pong");
     await say({
         text: "pong",
         thread_ts: event.ts,
     });
-});
+}); */
 
 (async () => {
     await app.start();
 
-    console.log("running in websocket mode");
+    logger.info("running in websocket mode");
 })();
