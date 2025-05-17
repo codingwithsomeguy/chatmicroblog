@@ -50,7 +50,11 @@ async function downloadImageUrl(url) {
     return axios.get(url, {
         headers: {Authorization: `Bearer ${process.env.CMB_SLACK_TOKEN}`},
         responseType: "arraybuffer",
-    }).then(response => response.data);
+    }).then(response => response.data).
+    catch(async err => {
+        logger.debug("downloadImageUrl: get error");;
+        return null;
+    });
 }
 
 async function publishStory(say, authorUserId, authorUserName, threadTs, storyLines, imgAttachment) {
@@ -79,6 +83,14 @@ async function publishStory(say, authorUserId, authorUserName, threadTs, storyLi
         thread_ts: threadTs,
     });
     const imgBinData = await downloadImageUrl(imageUrl);
+    if (imgBinData === null) {
+        logger.error("downloadImageUrl failed");
+        await say({
+            text: `Problem downloading image`,
+            thread_ts: threadTs,
+        });
+        return;
+    }
     const storyData = {
         authorid: authorUserId,
         authorname: authorUserName,
